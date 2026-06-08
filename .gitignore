@@ -1,0 +1,16 @@
+node_modules/
+.venv/
+venv/
+.env
+logs/
+.DS_Store
+.pids
+.pids.bak
+dist/
+build/
+.gemini/
+brain/
+walkthrough.md
+task.md
+implementation_plan.md
+*.log

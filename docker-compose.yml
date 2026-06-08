@@ -1,0 +1,176 @@
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────
+  # Core Infrastructure
+  # ─────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: csa_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # Module 1: AI Brain Gateway
+  # ─────────────────────────────────────────────
+  ai-brain:
+    build:
+      context: ./apps/ai-brain
+      dockerfile: Dockerfile
+    container_name: csa_ai_brain
+    restart: unless-stopped
+    ports:
+      - "${AI_BRAIN_PORT:-3000}:3000"
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────
+  # Module 2a: GitHub Recon Agent
+  # ─────────────────────────────────────────────
+  github-recon:
+    build:
+      context: ./apps/ingestion/github-recon
+      dockerfile: Dockerfile
+    container_name: csa_github_recon
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+
+  # ─────────────────────────────────────────────
+  # Module 2b: Whale Network Tracker
+  # ─────────────────────────────────────────────
+  whale-tracker:
+    build:
+      context: ./apps/ingestion/whale-tracker
+      dockerfile: Dockerfile
+    container_name: csa_whale_tracker
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+
+  # ─────────────────────────────────────────────
+  # Module 2c: SEC Edgar Poller
+  # ─────────────────────────────────────────────
+  sec-poller:
+    build:
+      context: ./apps/ingestion/sec-poller
+      dockerfile: Dockerfile
+    container_name: csa_sec_poller
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+
+  # ─────────────────────────────────────────────
+  # Module 3a: Twitter/X Headless Scraper
+  # ─────────────────────────────────────────────
+  twitter-scraper:
+    build:
+      context: ./apps/social-mining/twitter-scraper
+      dockerfile: Dockerfile
+    container_name: csa_twitter_scraper
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+    # Playwright needs extra permissions
+    shm_size: "2gb"
+    security_opt:
+      - seccomp:unconfined
+
+  # ─────────────────────────────────────────────
+  # Module 3b: Reddit Keyword Miner
+  # ─────────────────────────────────────────────
+  reddit-miner:
+    build:
+      context: ./apps/social-mining/reddit-miner
+      dockerfile: Dockerfile
+    container_name: csa_reddit_miner
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+
+  # ─────────────────────────────────────────────
+  # Module 4: Scoring Engine + WebSocket Server
+  # ─────────────────────────────────────────────
+  scoring-engine:
+    build:
+      context: ./packages/scoring-engine
+      dockerfile: Dockerfile
+    container_name: csa_scoring_engine
+    restart: unless-stopped
+    ports:
+      - "${WS_PORT:-3001}:3001"
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      ai-brain:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - AI_BRAIN_URL=http://ai-brain:3000
+
+  # ─────────────────────────────────────────────
+  # Module 4: Audio Alert Worker (host network for TTS access)
+  # ─────────────────────────────────────────────
+  audio-worker:
+    build:
+      context: ./apps/social-mining/audio-worker
+      dockerfile: Dockerfile
+    container_name: csa_audio_worker
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    network_mode: host
+    volumes:
+      - /dev/snd:/dev/snd  # Audio device access
+    devices:
+      - /dev/snd
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: csa_network
+    driver: bridge

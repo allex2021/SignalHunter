@@ -1,0 +1,4 @@
+praw==7.7.1
+redis==5.0.4
+python-dotenv==1.0.1
+asyncpraw==7.7.1

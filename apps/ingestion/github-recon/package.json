@@ -1,0 +1,25 @@
+{
+  "name": "@csa/github-recon",
+  "version": "1.0.0",
+  "description": "GitHub Recon Agent - monitors Web3 repos for on-chain signal events",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@csa/shared-types": "*",
+    "ioredis": "^5.3.2",
+    "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/uuid": "^9.0.8",
+    "tsx": "^4.7.3",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@csa/scoring-engine",
+  "version": "1.0.0",
+  "description": "Quantitative scoring engine for crypto market signal aggregation",
+  "main": "dist/aggregator.js",
+  "scripts": {
+    "dev": "tsx watch src/aggregator.ts",
+    "build": "tsc",
+    "start": "node dist/aggregator.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@csa/shared-types": "*",
+    "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.3.2",
+    "uuid": "^9.0.1",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/uuid": "^9.0.8",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.7.3",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "crypto-signal-aggregator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hyper-Aggressive Market Intelligence & Signal Aggregator — 100% Free Infrastructure",
+  "workspaces": [
+    "apps/ai-brain",
+    "apps/terminal-ui",
+    "apps/ingestion/github-recon",
+    "packages/shared-types",
+    "packages/scoring-engine"
+  ],
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail \"npm run dev --workspace=apps/ai-brain\" \"npm run dev --workspace=packages/scoring-engine\" \"npm run dev --workspace=apps/ingestion/github-recon\"",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint . --ext .ts,.js",
+    "health": "bash scripts/health-check.sh",
+    "start:all": "bash scripts/start-all.sh"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "redis-memory-server": "^0.16.1",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

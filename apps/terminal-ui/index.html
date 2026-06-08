@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚡ ALPHA INTELLIGENCE — Crypto Signal Aggregator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet" />
+  <script src="lightweight-charts.js"></script>
+
+
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-void:      #0a0a0f;
+      --bg-panel:     rgba(14, 14, 22, 0.85);
+      --bg-card:      rgba(20, 20, 34, 0.9);
+      --bg-entry:     rgba(16, 16, 28, 0.7);
+
+      --clr-green:    #00ff88;
+      --clr-red:      #ff3366;
+      --clr-yellow:   #ffcc00;
+      --clr-cyan:     #00d4ff;
+      --clr-purple:   #b84fff;
+      --clr-dim:      #4a4a6a;
+      --clr-muted:    #6b6b8e;
+      --clr-text:     #c8c8e8;
+      --clr-bright:   #e8e8ff;
+
+      --border-glow-green: 0 0 12px rgba(0,255,136,0.35), 0 0 1px rgba(0,255,136,0.8);
+      --border-glow-red:   0 0 12px rgba(255,51,102,0.35), 0 0 1px rgba(255,51,102,0.8);
+
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg-void);
+      color: var(--clr-text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      overflow: hidden;
+    }
+
+    /* ─── Matrix Rain Background ───────────────────────────────────────────── */
+    #matrix-bg {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 0;
+      opacity: 0.04;
+      pointer-events: none;
+    }
+
+    /* ─── Scanline Overlay ─────────────────────────────────────────────────── */
+    .scanlines {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.04) 2px,
+        rgba(0, 0, 0, 0.04) 4px
+      );
+      animation: scanlineScroll 8s linear infinite;
+    }
+    @keyframes scanlineScroll {
+      0%   { background-position: 0 0; }
+      100% { background-position: 0 100px; }
+    }
+
+    /* ─── Vignette ─────────────────────────────────────────────────────────── */
+    .vignette {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center,
+        transparent 50%,
+        rgba(0, 0, 0, 0.7) 100%
+      );
+    }
+
+    /* ─── App Shell ────────────────────────────────────────────────────────── */
+    #app {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 0;
+    }
+
+    /* ─── Header ───────────────────────────────────────────────────────────── */
+    #header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: rgba(10, 10, 18, 0.95);
+      border-bottom: 1px solid rgba(0, 255, 136, 0.18);
+      box-shadow: 0 2px 20px rgba(0, 255, 136, 0.08);
+      flex-shrink: 0;
+      gap: 12px;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .logo-text {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--clr-green);
+      text-shadow: 0 0 20px rgba(0,255,136,0.7), 0 0 40px rgba(0,255,136,0.3);
+      animation: logoGlow 3s ease-in-out infinite alternate;
+    }
+    @keyframes logoGlow {
+      from { text-shadow: 0 0 10px rgba(0,255,136,0.5), 0 0 30px rgba(0,255,136,0.2); }
+      to   { text-shadow: 0 0 25px rgba(0,255,136,0.9), 0 0 60px rgba(0,255,136,0.4), 0 0 80px rgba(0,255,136,0.15); }
+    }
+
+    .logo-sub {
+      font-size: 10px;
+      color: var(--clr-muted);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* Provider health row */
+    .header-providers {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .provider-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--clr-muted);
+    }
+
+    .provider-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--clr-dim);
+      transition: background 0.4s, box-shadow 0.4s;
+    }
+    .provider-dot.healthy {
+      background: var(--clr-green);
+      box-shadow: 0 0 6px var(--clr-green);
+      animation: dotPulse 2s ease-in-out infinite;
+    }
+    .provider-dot.degraded {
+      background: var(--clr-yellow);
+      box-shadow: 0 0 6px var(--clr-yellow);
+    }
+    .provider-dot.down {
+      background: var(--clr-red);
+      box-shadow: 0 0 6px var(--clr-red);
+    }
+    @keyframes dotPulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+
+    /* Header right section */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-shrink: 0;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .stat-label {
+      font-size: 9px;
+      color: var(--clr-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .stat-value {
+      font-size: 13px;
+      color: var(--clr-cyan);
+      font-weight: 600;
+    }
+
+    #utc-clock {
+      font-size: 14px;
+      color: var(--clr-green);
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-shadow: 0 0 10px rgba(0,255,136,0.4);
+    }
+
+    /* ─── Disconnected Banner ──────────────────────────────────────────────── */
+    #disconnect-banner {
+      display: none;
+      background: rgba(255, 51, 102, 0.15);
+      border-bottom: 1px solid rgba(255, 51, 102, 0.4);
+      color: var(--clr-red);
+      text-align: center;
+      padding: 6px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      animation: bannerFlash 1s ease-in-out infinite;
+    }
+    #disconnect-banner.visible { display: block; }
+    @keyframes bannerFlash {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+
+    /* ─── Main Grid ────────────────────────────────────────────────────────── */
+    #main-grid {
+      display: grid;
+      grid-template-columns: 30fr 40fr 30fr;
+      gap: 0;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* ─── SMC Liquidity Engine Styling ──────────────────────────────────────── */
+    #center-panel {
+      border-right: 1px solid rgba(0, 212, 255, 0.1);
+      border-left: 1px solid rgba(0, 255, 136, 0.1);
+    }
+    
+    #asset-selector:hover, #asset-selector:focus {
+      border-color: var(--clr-green) !important;
+      box-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+    }
+    
+    .smc-grid-item {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 10px 12px;
+      transition: all 0.3s;
+    }
+    
+    .smc-grid-item:hover {
+      border-color: rgba(0, 255, 136, 0.15);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+    
+    .smc-grid-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      padding-bottom: 4px;
+      margin-bottom: 8px;
+    }
+    
+    .smc-grid-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--clr-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .smc-grid-sub {
+      font-size: 8px;
+      color: var(--clr-muted);
+      letter-spacing: 0.5px;
+    }
+    
+    .smc-row-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2px;
+    }
+    
+    .smc-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    
+    .label-premium { color: var(--clr-red); }
+    .label-discount { color: var(--clr-green); }
+    
+    .smc-value {
+      font-size: 11px;
+      font-weight: 800;
+    }
+    
+    .value-premium { color: var(--clr-red); }
+    .value-discount { color: var(--clr-green); }
+    
+    .smc-desc {
+      font-size: 9px;
+      color: var(--clr-muted);
+      margin-bottom: 4px;
+    }
+    
+    .smc-bar-outer {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 2px;
+      height: 4px;
+      overflow: hidden;
+      width: 100%;
+    }
+    
+    .smc-bar-inner {
+      height: 0%;
+      border-radius: 2px;
+      transition: width 0.3s ease-out;
+    }
+    
+    .bar-premium {
+      background: linear-gradient(95deg, rgba(255, 51, 102, 0.4), var(--clr-red));
+      box-shadow: 0 0 6px rgba(255, 51, 102, 0.5);
+    }
+    
+    .bar-discount {
+      background: linear-gradient(95deg, rgba(0, 255, 136, 0.4), var(--clr-green));
+      box-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+    }
+    
+    .block-card {
+      background: rgba(10, 10, 15, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      padding: 8px 10px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .block-supply {
+      border-left: 3px solid var(--clr-red);
+      background: linear-gradient(135deg, rgba(255, 51, 102, 0.03), transparent);
+    }
+    
+    .block-demand {
+      border-left: 3px solid var(--clr-green);
+      background: linear-gradient(135deg, rgba(0, 255, 136, 0.03), transparent);
+    }
+    
+    .block-card-header {
+      font-size: 8px;
+      color: var(--clr-muted);
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    
+    .block-card-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--clr-bright);
+      margin-bottom: 4px;
+    }
+    
+    .block-card-price {
+      font-size: 11px;
+      font-weight: 800;
+      margin-bottom: 2px;
+    }
+    
+    .block-supply .block-card-price { color: var(--clr-red); }
+    .block-demand .block-card-price { color: var(--clr-green); }
+    
+    .block-card-meta {
+      font-size: 9px;
+      color: var(--clr-muted);
+      line-height: 1.2;
+    }
+    
+    .warning-box {
+      background: rgba(255, 204, 0, 0.05);
+      border: 1px solid rgba(255, 204, 0, 0.15);
+      border-radius: 4px;
+      padding: 8px 12px;
+    }
+    
+    .warning-text {
+      font-size: 10px;
+      color: var(--clr-bright);
+      line-height: 1.3;
+    }
+    
+    /* Price flash animations */
+    .ticker-flash-green {
+      animation: flashGreen 0.4s ease-out;
+    }
+    .ticker-flash-red {
+      animation: flashRed 0.4s ease-out;
+    }
+    
+    @keyframes flashGreen {
+      0% { color: var(--clr-green); text-shadow: 0 0 12px var(--clr-green); }
+      100% { color: var(--clr-green); }
+    }
+    @keyframes flashRed {
+      0% { color: var(--clr-red); text-shadow: 0 0 12px var(--clr-red); }
+      100% { color: var(--clr-red); }
+    }
+    
+    #sweep-feed-log::-webkit-scrollbar { width: 4px; }
+    #sweep-feed-log::-webkit-scrollbar-track { background: transparent; }
+    #sweep-feed-log::-webkit-scrollbar-thumb { background: rgba(0, 212, 255, 0.2); border-radius: 2px; }
+    
+    /* 3-column layout media query */
+    @media (max-width: 1200px) {
+      #main-grid {
+        grid-template-columns: 1fr !important;
+        grid-template-rows: repeat(3, 1fr) !important;
+        overflow-y: auto !important;
+      }
+      html, body {
+        overflow: auto !important;
+        height: auto !important;
+      }
+      #app {
+        height: auto !important;
+        min-height: 100vh;
+      }
+      #left-panel, #center-panel, #right-panel {
+        border-right: none !important;
+        border-left: none !important;
+        border-bottom: 1px solid rgba(0, 255, 136, 0.1) !important;
+      }
+    }
+
+    /* ─── Panels ───────────────────────────────────────────────────────────── */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-panel);
+      border: 1px solid rgba(255,255,255,0.05);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    #left-panel {
+      border-right: 1px solid rgba(0, 255, 136, 0.1);
+    }
+
+    #right-panel {
+      border-left: 1px solid rgba(0, 212, 255, 0.1);
+      animation: panelBorderPulse 4s ease-in-out infinite;
+    }
+    @keyframes panelBorderPulse {
+      0%, 100% { border-left-color: rgba(0, 212, 255, 0.1); box-shadow: none; }
+      50%       { border-left-color: rgba(0, 212, 255, 0.35); box-shadow: inset 3px 0 20px rgba(0, 212, 255, 0.05); }
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      background: rgba(0,0,0,0.25);
+      flex-shrink: 0;
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--clr-cyan);
+    }
+
+    .panel-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--clr-muted);
+    }
+
+    .count-badge {
+      background: rgba(0, 212, 255, 0.12);
+      border: 1px solid rgba(0, 212, 255, 0.25);
+      color: var(--clr-cyan);
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      transition: all 0.3s;
+    }
+
+    /* ─── Left Panel: Intel Stream ─────────────────────────────────────────── */
+    #intel-stream {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 0;
+      scroll-behavior: smooth;
+    }
+
+    #intel-stream::-webkit-scrollbar { width: 4px; }
+    #intel-stream::-webkit-scrollbar-track { background: transparent; }
+    #intel-stream::-webkit-scrollbar-thumb { background: rgba(0,255,136,0.2); border-radius: 2px; }
+
+    .intel-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 6px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.025);
+      cursor: default;
+      animation: entryFadeIn 0.4s ease-out forwards;
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: background 0.2s;
+    }
+    .intel-entry:hover { background: rgba(255,255,255,0.03); }
+
+    @keyframes entryFadeIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .intel-entry.bullish  .entry-bias-bar { background: var(--clr-green); }
+    .intel-entry.bearish  .entry-bias-bar { background: var(--clr-red); }
+    .intel-entry.volatility .entry-bias-bar { background: var(--clr-yellow); }
+    .intel-entry.neutral  .entry-bias-bar { background: var(--clr-dim); }
+
+    .entry-bias-bar {
+      width: 3px;
+      min-height: 36px;
+      border-radius: 2px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .entry-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .entry-top-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .entry-ts {
+      font-size: 10px;
+      color: var(--clr-muted);
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+
+    .entry-source {
+      font-size: 10px;
+      padding: 1px 7px;
+      border-radius: 3px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .source-GitHub_Commit   { background: rgba(168,85,247,0.2); color: var(--clr-purple); border: 1px solid rgba(168,85,247,0.3); }
+    .source-SEC_Filing      { background: rgba(255,204,0,0.12); color: var(--clr-yellow); border: 1px solid rgba(255,204,0,0.25); }
+    .source-Whale_Flow      { background: rgba(0,212,255,0.12); color: var(--clr-cyan);   border: 1px solid rgba(0,212,255,0.25); }
+    .source-X_Scrape        { background: rgba(255,255,255,0.08); color: #e0e0e0;         border: 1px solid rgba(255,255,255,0.15); }
+    .source-Reddit_Spike    { background: rgba(255,69,0,0.15);  color: #ff6633;           border: 1px solid rgba(255,69,0,0.25); }
+
+    .entry-bias-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .bias-Bullish            { color: var(--clr-green);  background: rgba(0,255,136,0.1);  border: 1px solid rgba(0,255,136,0.2); }
+    .bias-Bearish            { color: var(--clr-red);    background: rgba(255,51,102,0.1); border: 1px solid rgba(255,51,102,0.2); }
+    .bias-Volatility-Driven  { color: var(--clr-yellow); background: rgba(255,204,0,0.1);  border: 1px solid rgba(255,204,0,0.2); }
+    .bias-Neutral            { color: var(--clr-muted);  background: rgba(74,74,106,0.1);  border: 1px solid rgba(74,74,106,0.2); }
+
+    .entry-summary {
+      font-size: 12px;
+      color: var(--clr-bright);
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .impact-dots {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .impact-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--clr-dim);
+    }
+
+    /* impact 1-3=dim, 4-6=yellow, 7-8=green, 9-10=red */
+    .intel-entry.impact-high .impact-dot.active  { background: var(--clr-red); box-shadow: 0 0 4px var(--clr-red); }
+    .intel-entry.impact-med .impact-dot.active   { background: var(--clr-green); box-shadow: 0 0 4px var(--clr-green); }
+    .intel-entry.impact-low .impact-dot.active   { background: var(--clr-yellow); }
+    .intel-entry.impact-noise .impact-dot.active { background: var(--clr-dim); }
+
+    /* Alert flash for impact >= 8 */
+    .intel-entry.alert-flash {
+      animation: entryFadeIn 0.4s ease-out forwards, alertFlash 0.8s ease-in-out 0.4s 3;
+    }
+    @keyframes alertFlash {
+      0%, 100% { background: transparent; }
+      50%       { background: rgba(255, 51, 102, 0.12); }
+    }
+
+    /* ─── Right Panel: Alpha Priority ──────────────────────────────────────── */
+    .alpha-counter-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #alpha-today-count {
+      font-size: 11px;
+      color: var(--clr-muted);
+    }
+
+    #signals-today {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--clr-green);
+      text-shadow: 0 0 10px rgba(0,255,136,0.5);
+      transition: all 0.3s;
+      display: inline-block;
+    }
+
+    #alpha-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    #alpha-list::-webkit-scrollbar { width: 4px; }
+    #alpha-list::-webkit-scrollbar-track { background: transparent; }
+    #alpha-list::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.2); border-radius: 2px; }
+
+    .alpha-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      animation: cardSlideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      opacity: 0;
+      transform: scale(0.95) translateX(10px);
+      position: relative;
+      overflow: hidden;
+      cursor: default;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .alpha-card:hover {
+      border-color: rgba(0,212,255,0.25);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    @keyframes cardSlideIn {
+      to { opacity: 1; transform: scale(1) translateX(0); }
+    }
+
+    /* Left accent bar on each card */
+    .alpha-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      border-radius: 6px 0 0 6px;
+    }
+    .alpha-card.bullish::before    { background: var(--clr-green); box-shadow: 0 0 8px var(--clr-green); }
+    .alpha-card.bearish::before    { background: var(--clr-red);   box-shadow: 0 0 8px var(--clr-red); }
+    .alpha-card.volatility::before { background: var(--clr-yellow); box-shadow: 0 0 8px var(--clr-yellow); }
+    .alpha-card.neutral::before    { background: var(--clr-dim); }
+
+    /* Shimmer for new high-impact cards */
+    .alpha-card.new-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%; right: 0; bottom: 0;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255,255,255,0.05) 50%,
+        transparent 100%
+      );
+      animation: cardShimmer 1s ease-out forwards;
+    }
+    @keyframes cardShimmer {
+      to { left: 100%; }
+    }
+
+    /* Impact score in corner */
+    .card-impact-ring {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .card-impact-ring.impact-critical {
+      background: rgba(255, 51, 102, 0.15);
+      border: 2px solid var(--clr-red);
+      color: var(--clr-red);
+      box-shadow: 0 0 15px rgba(255,51,102,0.4);
+      animation: impactPulse 1s ease-in-out infinite;
+    }
+    .card-impact-ring.impact-high {
+      background: rgba(0, 255, 136, 0.12);
+      border: 2px solid var(--clr-green);
+      color: var(--clr-green);
+      box-shadow: 0 0 10px rgba(0,255,136,0.3);
+    }
+    @keyframes impactPulse {
+      0%, 100% { box-shadow: 0 0 15px rgba(255,51,102,0.4); }
+      50%       { box-shadow: 0 0 30px rgba(255,51,102,0.8), 0 0 60px rgba(255,51,102,0.2); }
+    }
+
+    .card-row1 {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-right: 52px;
+      margin-bottom: 6px;
+    }
+
+    .card-source {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card-bias {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 3px;
+    }
+
+    .card-summary {
+      font-size: 12px;
+      color: var(--clr-bright);
+      line-height: 1.45;
+      padding-right: 52px;
+      margin-bottom: 8px;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-ts {
+      font-size: 9px;
+      color: var(--clr-muted);
+    }
+
+    .card-id {
+      font-size: 9px;
+      color: rgba(74,74,106,0.7);
+      font-variant: monospace;
+    }
+
+    /* Flashing border for impact >= 8 */
+    .alpha-card.ultra-high {
+      animation: cardSlideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards,
+                 ultraHighFlash 1.2s ease-in-out 0.5s 5;
+    }
+    @keyframes ultraHighFlash {
+      0%, 100% { border-color: rgba(255,255,255,0.08); }
+      50%       { border-color: rgba(255, 51, 102, 0.6); box-shadow: 0 0 20px rgba(255,51,102,0.2); }
+    }
+
+    /* ─── Footer ───────────────────────────────────────────────────────────── */
+    #footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 20px;
+      background: rgba(10, 10, 18, 0.98);
+      border-top: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
+      gap: 16px;
+    }
+
+    .footer-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #ws-status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    #ws-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--clr-dim);
+      transition: background 0.4s, box-shadow 0.4s;
+    }
+    #ws-dot.connected {
+      background: var(--clr-green);
+      box-shadow: 0 0 8px var(--clr-green);
+      animation: wsDotPulse 1.5s ease-in-out infinite;
+    }
+    #ws-dot.connecting {
+      background: var(--clr-yellow);
+      box-shadow: 0 0 6px var(--clr-yellow);
+      animation: wsDotPulse 0.5s ease-in-out infinite;
+    }
+    #ws-dot.disconnected {
+      background: var(--clr-red);
+      box-shadow: 0 0 6px var(--clr-red);
+    }
+    @keyframes wsDotPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.6; transform: scale(0.8); }
+    }
+
+    #ws-status-text {
+      color: var(--clr-muted);
+    }
+
+    .footer-divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .footer-stat {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+    }
+
+    .footer-stat-label {
+      color: var(--clr-muted);
+    }
+
+    .footer-stat-value {
+      color: var(--clr-cyan);
+      font-weight: 700;
+    }
+
+    #last-update {
+      color: var(--clr-muted);
+      font-size: 11px;
+    }
+
+    /* ─── Misc utilities ───────────────────────────────────────────────────── */
+    .json-key    { color: var(--clr-cyan); }
+    .json-str    { color: #98d982; }
+    .json-num    { color: #ff9944; }
+    .json-bool   { color: var(--clr-purple); }
+    .json-null   { color: var(--clr-dim); }
+    .json-punct  { color: var(--clr-muted); }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+      color: var(--clr-dim);
+    }
+
+    .empty-state-icon {
+      font-size: 32px;
+      opacity: 0.4;
+    }
+
+    .empty-state-text {
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .blink {
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+
+    /* Impact bar (horizontal) in left panel */
+    .impact-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .impact-bar-track {
+      flex: 1;
+      height: 3px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      max-width: 80px;
+    }
+    .impact-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.5s ease-out;
+    }
+    .impact-num {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--clr-muted);
+      min-width: 16px;
+      text-align: right;
+    }
+
+    /* Uptime badge */
+    #uptime-badge {
+      color: var(--clr-muted);
+      font-size: 11px;
+    }
+
+    /* Reconnect attempt indicator */
+    #reconnect-info {
+      font-size: 10px;
+      color: var(--clr-yellow);
+      display: none;
+    }
+    #reconnect-info.visible { display: inline; }
+  </style>
+</head>
+<body>
+
+<!-- Matrix Rain Canvas -->
+<canvas id="matrix-bg"></canvas>
+
+<!-- Overlays -->
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<!-- App -->
+<div id="app">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <header id="header">
+    <div class="header-logo">
+      <div>
+        <div class="logo-text">⚡ ALPHA INTELLIGENCE</div>
+        <div class="logo-sub">Crypto Signal Aggregator v1.0</div>
+      </div>
+    </div>
+
+    <!-- Provider health indicators -->
+    <div class="header-providers">
+      <div class="provider-indicator" id="prov-AI-Brain-Gateway">
+        <div class="provider-dot" id="dot-AI-Brain-Gateway"></div>
+        <span>AI-Brain</span>
+      </div>
+      <div class="provider-indicator" id="prov-Redis">
+        <div class="provider-dot" id="dot-Redis"></div>
+        <span>Redis</span>
+      </div>
+      <div class="provider-indicator" id="prov-github">
+        <div class="provider-dot" id="dot-stream-github"></div>
+        <span>GitHub</span>
+      </div>
+      <div class="provider-indicator" id="prov-whale">
+        <div class="provider-dot" id="dot-stream-whale"></div>
+        <span>Whale</span>
+      </div>
+      <div class="provider-indicator" id="prov-sec">
+        <div class="provider-dot" id="dot-stream-sec"></div>
+        <span>SEC</span>
+      </div>
+      <div class="provider-indicator" id="prov-social">
+        <div class="provider-dot" id="dot-stream-social"></div>
+        <span>Social</span>
+      </div>
+      <div class="provider-indicator" id="prov-reddit">
+        <div class="provider-dot" id="dot-stream-reddit"></div>
+        <span>Reddit</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="stat-item">
+        <span class="stat-label">Uptime</span>
+        <span class="stat-value" id="uptime-badge">—</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Streams</span>
+        <span class="stat-value" id="streams-connected">0</span>
+      </div>
+      <span id="utc-clock">00:00:00 UTC</span>
+    </div>
+  </header>
+
+  <!-- ── Disconnect Banner ───────────────────────────────────────────────── -->
+  <div id="disconnect-banner">
+    ⚠ WEBSOCKET DISCONNECTED — Attempting reconnection... <span id="reconnect-info"></span>
+  </div>
+
+  <!-- ── Main Grid ───────────────────────────────────────────────────────── -->
+  <div id="main-grid">
+
+    <!-- Left: Intel Stream -->
+    <div class="panel" id="left-panel">
+      <div class="panel-header">
+        <span class="panel-title">📡 Live Intel Stream</span>
+        <div class="panel-badge">
+          <span>Total</span>
+          <span class="count-badge" id="total-events-badge">0</span>
+        </div>
+      </div>
+      <div id="intel-stream">
+        <div class="empty-state" id="intel-empty">
+          <div class="empty-state-icon">📡</div>
+          <div class="empty-state-text">Waiting for signals<span class="blink">_</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: SMC Engine -->
+    <div class="panel" id="center-panel">
+      <div class="panel-header">
+        <span class="panel-title" style="color: var(--clr-green);">⚡ SMC Liquidity & Order Flow Engine</span>
+        <div class="panel-badge">
+          <label for="asset-selector" style="font-size: 10px; color: var(--clr-muted); margin-right: 6px;">Asset:</label>
+          <select id="asset-selector" style="background: rgba(10, 10, 18, 0.9); border: 1px solid rgba(0, 255, 136, 0.4); color: var(--clr-green); font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; outline: none; cursor: pointer; transition: all 0.3s;">
+            <option value="BTC">BTC / USDT</option>
+            <option value="ETH">ETH / USDT</option>
+            <option value="SOL">SOL / USDT</option>
+            <option value="LTC" selected>LTC / USDT</option>
+            <option value="XRP">XRP / USDT</option>
+            <option value="ADA">ADA / USDT</option>
+            <option value="DOT">DOT / USDT</option>
+            <option value="LINK">LINK / USDT</option>
+          </select>
+          <button id="sound-toggle" style="background: transparent; border: none; color: var(--clr-muted); font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin-left: 10px; padding: 2px; outline: none; transition: all 0.3s; vertical-align: middle;" title="Mute/Unmute Alerts">🔇</button>
+        </div>
+      </div>
+      
+      <!-- Live Ticker Info Bar -->
+      <div id="ticker-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: rgba(0, 0, 0, 0.4); border-bottom: 1px solid rgba(255, 255, 255, 0.05); flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="ticker-symbol" style="font-weight: 800; font-size: 14px; color: var(--clr-bright);">LTC/USDT</span>
+          <span id="ticker-price-container" style="display: flex; align-items: center; gap: 4px;">
+            <span id="ticker-price" style="font-weight: 800; font-size: 14px; color: var(--clr-green); transition: color 0.15s;">$0.00</span>
+            <span id="price-direction-arrow" style="font-size: 10px; color: var(--clr-green); transition: transform 0.2s;">➔</span>
+          </span>
+        </div>
+        <div style="display: flex; gap: 16px; font-size: 11px;">
+          <div>
+            <span style="color: var(--clr-muted);">24h Chg:</span>
+            <span id="ticker-change" style="font-weight: 700; color: var(--clr-green);">$0.00%</span>
+          </div>
+          <div>
+            <span style="color: var(--clr-muted);">24h Vol:</span>
+            <span id="ticker-volume" style="font-weight: 700; color: var(--clr-cyan);">0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation Bar -->
+      <div class="smc-tabs-container" style="display: flex; background: rgba(10, 10, 18, 0.6); border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;">
+        <button class="smc-tab-btn active" id="tab-btn-metrics" style="flex: 1; padding: 10px; background: transparent; border: none; border-bottom: 2px solid var(--clr-green); color: var(--clr-green); font-family: var(--font-mono); font-size: 11px; font-weight: 800; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: all 0.25s; text-shadow: 0 0 6px rgba(0, 255, 136, 0.4); outline: none;">📊 SMC Metrics</button>
+        <button class="smc-tab-btn" id="tab-btn-chart" style="flex: 1; padding: 10px; background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--clr-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 800; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: all 0.25s; outline: none;">📈 SMC Chart</button>
+      </div>
+
+      <!-- Tab 1: Metrics Content Container -->
+      <div id="tab-content-metrics" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;">
+        <!-- 4-Grid SMC Container -->
+        <div id="smc-grid-container" style="flex: 1; display: grid; grid-template-columns: 1fr; grid-template-rows: repeat(4, auto); gap: 10px; padding: 12px; overflow-y: auto; min-height: 0;">
+          
+          <!-- Grid 1: Live Liquidity Pools Matrix (BSL/SSL Tracking) -->
+          <div class="smc-grid-item" id="grid-liq-pools">
+            <div class="smc-grid-header">
+              <span class="smc-grid-title">🌊 Live Liquidity Pools Matrix</span>
+              <span class="smc-grid-sub">BSL / SSL STOP-LOSS TARGETS</span>
+            </div>
+            <div class="smc-grid-content">
+              <!-- BSL -->
+              <div class="smc-row" style="margin-bottom: 10px;">
+                <div class="smc-row-header">
+                  <span class="smc-label label-premium">BUY-SIDE LIQUIDITY (BSL)</span>
+                  <span class="smc-value value-premium" id="bsl-range">$0.00 - $0.00</span>
+                </div>
+                <div class="smc-desc">Retail Short Stop-Loss Target (Live Price Magnet)</div>
+                <div class="smc-bar-outer">
+                  <div class="smc-bar-inner bar-premium" id="bsl-bar" style="width: 0%;"></div>
+                </div>
+              </div>
+              <!-- SSL -->
+              <div class="smc-row">
+                <div class="smc-row-header">
+                  <span class="smc-label label-discount">SELL-SIDE LIQUIDITY (SSL)</span>
+                  <span class="smc-value value-discount" id="ssl-range">$0.00 - $0.00</span>
+                </div>
+                <div class="smc-desc">Retail Long Stop-Loss Target (Live Hunt Zone)</div>
+                <div class="smc-bar-outer">
+                  <div class="smc-bar-inner bar-discount" id="ssl-bar" style="width: 0%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grid 2: Institutional Order Blocks (Live Supply & Demand) -->
+          <div class="smc-grid-item" id="grid-order-blocks">
+            <div class="smc-grid-header">
+              <span class="smc-grid-title">🏢 Institutional Order Blocks</span>
+              <span class="smc-grid-sub">LIVE SUPPLY & DEMAND WALLS</span>
+            </div>
+            <div class="smc-grid-content" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <!-- Supply Block -->
+              <div class="block-card block-supply">
+                <div class="block-card-header">DISTRIBUTION ZONE</div>
+                <div class="block-card-title">Whale Supply Zone</div>
+                <div class="block-card-price" id="supply-block-range">$0.00 - $0.00</div>
+                <div class="block-card-meta">Live Institutional Distribution Block</div>
+                <div style="margin-top: 6px; font-size: 9px; color: var(--clr-muted); text-transform: uppercase;">TP Walls: <span id="supply-wall-depth" style="color: var(--clr-red); font-weight: 700;">0.00</span></div>
+              </div>
+              <!-- Demand Block -->
+              <div class="block-card block-demand">
+                <div class="block-card-header">ACCUMULATION ZONE</div>
+                <div class="block-card-title">Whale Demand Zone</div>
+                <div class="block-card-price" id="demand-block-range">$0.00 - $0.00</div>
+                <div class="block-card-meta">Live Institutional Accumulation Block</div>
+                <div style="margin-top: 6px; font-size: 9px; color: var(--clr-muted); text-transform: uppercase;">Buy Walls: <span id="demand-wall-depth" style="color: var(--clr-green); font-weight: 700;">0.00</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grid 3: Dynamic Trendline Trap Detector -->
+          <div class="smc-grid-item" id="grid-trap-detector">
+            <div class="smc-grid-header">
+              <span class="smc-grid-title">⚠️ Trendline Trap Detector</span>
+              <span class="smc-grid-sub">RETAIL LIQUIDITY GRABS</span>
+            </div>
+            <div class="smc-grid-content">
+              <div id="trend-status-container" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid var(--clr-dim); margin-bottom: 8px; transition: border-left-color 0.3s;">
+                <span style="font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--clr-bright);">Market Bias</span>
+                <span id="trend-status-badge" style="font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 3px; letter-spacing: 0.5px;">CHECKING DYNAMIC TREND...</span>
+              </div>
+              <div class="warning-box" id="trap-warning-container" style="transition: border-color 0.3s, background 0.3s;">
+                <div style="display: flex; gap: 8px;">
+                  <span style="font-size: 16px; line-height: 1.2;">⚠️</span>
+                  <div>
+                    <div style="font-weight: 800; font-size: 10px; text-transform: uppercase; color: var(--clr-yellow); letter-spacing: 0.5px; margin-bottom: 2px;">Liquidity Trap Active</div>
+                    <div class="warning-text" id="trap-warning-text" style="font-size: 11px; line-height: 1.4; color: var(--clr-bright);">
+                      Calculating trapped liquidity parameters...
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grid 4: Real-Time Liquidity Sweep Notification Feed -->
+          <div class="smc-grid-item" id="grid-sweep-feed" style="display: flex; flex-direction: column; min-height: 140px;">
+            <div class="smc-grid-header">
+              <span class="smc-grid-title">📡 Live Sweep Alerts Feed</span>
+              <span class="smc-grid-sub">ORDER FLOW SWEEP CONSOLE</span>
+            </div>
+            <div id="sweep-feed-log" style="flex: 1; background: rgba(5, 5, 10, 0.85); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; font-family: var(--font-mono); font-size: 10px; padding: 8px; overflow-y: auto; color: var(--clr-text); line-height: 1.45; max-height: 160px; min-height: 100px;">
+              <div style="color: var(--clr-muted); font-style: italic;">[SYSTEM] Connecting to asset order flow socket...</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Tab 2: Chart Content Container -->
+      <div id="tab-content-chart" style="flex: 1; display: none; background: #0a0a0f; position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden;">
+        <!-- Timeframe Selector Toolbar -->
+        <div id="chart-timeframe-selector" style="position: absolute; top: 12px; right: 12px; background: rgba(10, 10, 18, 0.85); backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 4px; padding: 3px 6px; display: flex; gap: 4px; z-index: 100; font-family: var(--font-mono); font-size: 10px;">
+          <button class="tf-btn active" data-tf="1m" style="color: var(--clr-green); background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.3); padding: 2px 6px; border-radius: 2px; cursor: pointer; font-size: 10px; font-weight: 800; font-family: inherit; transition: all 0.2s;">1M</button>
+          <button class="tf-btn" data-tf="5m" style="color: var(--clr-muted); background: transparent; border: 1px solid transparent; padding: 2px 6px; border-radius: 2px; cursor: pointer; font-size: 10px; font-weight: 700; font-family: inherit; transition: all 0.2s;">5M</button>
+          <button class="tf-btn" data-tf="15m" style="color: var(--clr-muted); background: transparent; border: 1px solid transparent; padding: 2px 6px; border-radius: 2px; cursor: pointer; font-size: 10px; font-weight: 700; font-family: inherit; transition: all 0.2s;">15M</button>
+          <button class="tf-btn" data-tf="1h" style="color: var(--clr-muted); background: transparent; border: 1px solid transparent; padding: 2px 6px; border-radius: 2px; cursor: pointer; font-size: 10px; font-weight: 700; font-family: inherit; transition: all 0.2s;">1H</button>
+        </div>
+      </div>
+
+      <!-- Risk Disclaimer Footer -->
+      <div id="disclaimer-bar" style="text-align: center; padding: 6px 12px; background: rgba(0, 0, 0, 0.5); border-top: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; font-size: 9px; color: var(--clr-muted); letter-spacing: 0.5px; line-height: 1.3;">
+        ⚠️ HIGH RISK WARNING: SMC ZONES ARE MATHEMATICAL PROJECTIONS. ALGORITHMIC HUNTING OF RETAIL STOP-LOSSES IS HIGHLY VOLATILE. PAST PERFORMANCE DOES NOT GUARANTEE FUTURE EXECUTION. LEVERAGE AT YOUR OWN PERIL.
+      </div>
+    </div>
+
+    <!-- Right: Alpha Priority -->
+    <div class="panel" id="right-panel">
+      <div class="panel-header">
+        <span class="panel-title">🎯 Alpha Signal Priority</span>
+        <div class="alpha-counter-row">
+          <div id="alpha-today-count">
+            <span id="signals-today">0</span>
+            <span style="font-size:10px; color: var(--clr-muted); margin-left:4px;">high-impact today</span>
+          </div>
+        </div>
+      </div>
+      <div id="alpha-list">
+        <div class="empty-state" id="alpha-empty">
+          <div class="empty-state-icon">🎯</div>
+          <div class="empty-state-text">Awaiting α≥7 signals<span class="blink">_</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#main-grid -->
+
+  <!-- ── Footer ─────────────────────────────────────────────────────────── -->
+  <footer id="footer">
+    <div class="footer-section">
+      <div id="ws-status-indicator">
+        <div id="ws-dot" class="disconnected"></div>
+        <span id="ws-status-text">Disconnected</span>
+      </div>
+      <div class="footer-divider"></div>
+      <div class="footer-stat">
+        <span class="footer-stat-label">Events/min:</span>
+        <span class="footer-stat-value" id="events-per-min">0</span>
+      </div>
+      <div class="footer-divider"></div>
+      <div class="footer-stat">
+        <span class="footer-stat-label">Total received:</span>
+        <span class="footer-stat-value" id="total-received">0</span>
+      </div>
+    </div>
+    <div class="footer-section">
+      <span id="last-update">Last update: —</span>
+    </div>
+  </footer>
+
+</div><!-- /#app -->
+
+<script src="main.js"></script>
+</body>
+</html>
