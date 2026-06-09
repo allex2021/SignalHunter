@@ -1213,6 +1213,25 @@
 
       <!-- Tab 2: Chart Content Container -->
       <div id="tab-content-chart" style="flex: 1; display: none; background: #0a0a0f; position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden;">
+        <!-- Floating Chart Settings Overlay (Top-Left) -->
+        <div id="chart-settings-overlay" style="position: absolute; top: 12px; left: 12px; background: rgba(10, 10, 18, 0.85); backdrop-filter: blur(6px); border: 1px solid rgba(0, 255, 136, 0.25); border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; z-index: 100; font-family: var(--font-mono); font-size: 10px; color: var(--clr-text); box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+          <div style="font-weight: 800; border-bottom: 1px solid rgba(0, 255, 136, 0.2); padding-bottom: 4px; margin-bottom: 4px; color: var(--clr-green); letter-spacing: 0.5px; text-transform: uppercase;">Chart Overlays</div>
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="toggle-trendlines" checked style="accent-color: var(--clr-green); cursor: pointer;"> Retail Trendline
+          </label>
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="toggle-liquidity" checked style="accent-color: var(--clr-green); cursor: pointer;"> BSL / SSL Pools
+          </label>
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="toggle-whale-walls" checked style="accent-color: var(--clr-green); cursor: pointer;"> Whale Order Walls
+          </label>
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="toggle-fvg" checked style="accent-color: var(--clr-green); cursor: pointer;"> Fair Value Gaps (FVG)
+          </label>
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="toggle-bos-choch" checked style="accent-color: var(--clr-green); cursor: pointer;"> BOS / CHoCH Breakouts
+          </label>
+        </div>
         <!-- Timeframe Selector Toolbar -->
         <div id="chart-timeframe-selector" style="position: absolute; top: 12px; right: 12px; background: rgba(10, 10, 18, 0.85); backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 4px; padding: 3px 6px; display: flex; gap: 4px; z-index: 100; font-family: var(--font-mono); font-size: 10px;">
           <button class="tf-btn active" data-tf="1m" style="color: var(--clr-green); background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.3); padding: 2px 6px; border-radius: 2px; cursor: pointer; font-size: 10px; font-weight: 800; font-family: inherit; transition: all 0.2s;">1M</button>
