@@ -755,6 +755,13 @@ let currentCandle = null;
 let isAudioMuted = true;
 let audioCtx = null;
 
+// Overlay Settings
+let showTrendlines = true;
+let showLiquidity = true;
+let showWhaleWalls = true;
+let showFVG = true;
+let showBosChoch = true;
+
 const DEFAULT_PRICES = {
   BTC:  { price: 68500.0, change: 1.25,  volume: 28500.0 },
   ETH:  { price: 3850.0,  change: -0.85, volume: 185000.0 },
@@ -773,6 +780,13 @@ let trendlineSeries = null;
 const priceLines = {};
 let currentChartData = [];
 let chartMarkers = [];
+
+// Indicator State
+let lastBullishFvg = null;
+let lastBearishFvg = null;
+let lastBosPrice = null;
+let lastChochPrice = null;
+let activeIndicatorMarkers = [];
 
 // DOM Cache
 const $assetSelector = document.getElementById('asset-selector');
@@ -810,6 +824,54 @@ const $tabContentChart = document.getElementById('tab-content-chart');
 if ($assetSelector) {
   $assetSelector.addEventListener('change', (e) => {
     switchAsset(e.target.value);
+  });
+}
+
+// Setup Checkbox Toggle Listeners
+const $toggleTrendlines = document.getElementById('toggle-trendlines');
+if ($toggleTrendlines) {
+  $toggleTrendlines.addEventListener('change', (e) => {
+    showTrendlines = e.target.checked;
+    if (trendlineSeries) {
+      trendlineSeries.applyOptions({ visible: showTrendlines });
+    }
+    addLogEntry(`${showTrendlines ? '👁️' : '🕶️'} Retail Trendline display toggled ${showTrendlines ? 'ON' : 'OFF'}.`, 'purple');
+  });
+}
+
+const $toggleLiquidity = document.getElementById('toggle-liquidity');
+if ($toggleLiquidity) {
+  $toggleLiquidity.addEventListener('change', (e) => {
+    showLiquidity = e.target.checked;
+    recalculateSMC(currentPrice, change24h);
+    addLogEntry(`${showLiquidity ? '👁️' : '🕶️'} Liquidity Pools display toggled ${showLiquidity ? 'ON' : 'OFF'}.`, 'purple');
+  });
+}
+
+const $toggleWhaleWalls = document.getElementById('toggle-whale-walls');
+if ($toggleWhaleWalls) {
+  $toggleWhaleWalls.addEventListener('change', (e) => {
+    showWhaleWalls = e.target.checked;
+    recalculateSMC(currentPrice, change24h);
+    addLogEntry(`${showWhaleWalls ? '👁️' : '🕶️'} Whale Order Walls display toggled ${showWhaleWalls ? 'ON' : 'OFF'}.`, 'purple');
+  });
+}
+
+const $toggleFvg = document.getElementById('toggle-fvg');
+if ($toggleFvg) {
+  $toggleFvg.addEventListener('change', (e) => {
+    showFVG = e.target.checked;
+    recalculateIndicators(currentChartData);
+    addLogEntry(`${showFVG ? '👁️' : '🕶️'} Fair Value Gaps display toggled ${showFVG ? 'ON' : 'OFF'}.`, 'purple');
+  });
+}
+
+const $toggleBosChoch = document.getElementById('toggle-bos-choch');
+if ($toggleBosChoch) {
+  $toggleBosChoch.addEventListener('change', (e) => {
+    showBosChoch = e.target.checked;
+    recalculateIndicators(currentChartData);
+    addLogEntry(`${showBosChoch ? '👁️' : '🕶️'} BOS / CHoCH display toggled ${showBosChoch ? 'ON' : 'OFF'}.`, 'purple');
   });
 }
 
@@ -1064,6 +1126,58 @@ function initChart() {
     title: 'TRAPPED LIQUIDITY LEVEL',
   });
 
+  // Create FVG Price Lines
+  priceLines.fvgBullishTop = candleSeries.createPriceLine({
+    price: 0,
+    color: 'transparent',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dotted,
+    axisLabelVisible: true,
+    title: 'BULLISH FVG TOP',
+  });
+  priceLines.fvgBullishBottom = candleSeries.createPriceLine({
+    price: 0,
+    color: 'transparent',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dotted,
+    axisLabelVisible: true,
+    title: 'BULLISH FVG BOTTOM',
+  });
+  priceLines.fvgBearishTop = candleSeries.createPriceLine({
+    price: 0,
+    color: 'transparent',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dotted,
+    axisLabelVisible: true,
+    title: 'BEARISH FVG TOP',
+  });
+  priceLines.fvgBearishBottom = candleSeries.createPriceLine({
+    price: 0,
+    color: 'transparent',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dotted,
+    axisLabelVisible: true,
+    title: 'BEARISH FVG BOTTOM',
+  });
+
+  // Create BOS / CHoCH Price Lines
+  priceLines.bosLevel = candleSeries.createPriceLine({
+    price: 0,
+    color: 'transparent',
+    lineWidth: 1.5,
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    axisLabelVisible: true,
+    title: 'BOS LEVEL',
+  });
+  priceLines.chochLevel = candleSeries.createPriceLine({
+    price: 0,
+    color: 'transparent',
+    lineWidth: 1.5,
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    axisLabelVisible: true,
+    title: 'CHoCH LEVEL',
+  });
+
   // Set up ResizeObserver to handle element size changes (including first render layout and tab switches)
   const resizeObserver = new ResizeObserver((entries) => {
     for (let entry of entries) {
@@ -1091,6 +1205,22 @@ function switchAsset(asset) {
   currentCandle = null;
   currentChartData = [];
   chartMarkers = [];
+  
+  // Reset indicator states
+  lastBullishFvg = null;
+  lastBearishFvg = null;
+  lastBosPrice = null;
+  lastChochPrice = null;
+  activeIndicatorMarkers = [];
+  
+  // Clear indicator price lines
+  if (priceLines.fvgBullishTop) priceLines.fvgBullishTop.applyOptions({ price: 0, color: 'transparent' });
+  if (priceLines.fvgBullishBottom) priceLines.fvgBullishBottom.applyOptions({ price: 0, color: 'transparent' });
+  if (priceLines.fvgBearishTop) priceLines.fvgBearishTop.applyOptions({ price: 0, color: 'transparent' });
+  if (priceLines.fvgBearishBottom) priceLines.fvgBearishBottom.applyOptions({ price: 0, color: 'transparent' });
+  if (priceLines.bosLevel) priceLines.bosLevel.applyOptions({ price: 0, color: 'transparent' });
+  if (priceLines.chochLevel) priceLines.chochLevel.applyOptions({ price: 0, color: 'transparent' });
+
   if (candleSeries) {
     try {
       candleSeries.setMarkers([]);
@@ -1162,6 +1292,7 @@ async function fetchBinanceInitialData(asset) {
       currentChartData = chartData;
       candleSeries.setData(chartData);
       drawTrendlineOnChart(chartData);
+      recalculateIndicators(chartData);
     }
   } else {
     console.error(`[SMC Engine] All REST endpoints failed. Falling back to local offline simulation.`);
@@ -1181,6 +1312,7 @@ async function fetchBinanceInitialData(asset) {
       currentChartData = chartData;
       candleSeries.setData(chartData);
       drawTrendlineOnChart(chartData);
+      recalculateIndicators(chartData);
     }
   }
 }
@@ -1255,11 +1387,260 @@ function addChartMarker(time, text, position = 'aboveBar', color = '#ffcc00', sh
     chartMarkers.shift();
   }
   
+  applyAllMarkers();
+}
+
+// Apply merged chartMarkers and activeIndicatorMarkers to chart
+function applyAllMarkers() {
+  if (!candleSeries) return;
+  const merged = [...chartMarkers, ...activeIndicatorMarkers];
+  // Sort by time (ascending) to prevent Lightweight Charts crash
+  merged.sort((a, b) => a.time - b.time);
+  
   try {
-    candleSeries.setMarkers(chartMarkers);
+    candleSeries.setMarkers(merged);
   } catch (e) {
     console.error('[SMC Chart] Failed to set markers:', e);
   }
+}
+
+// SMC Mathematical Indicator Engine (FVG & BOS/CHoCH Detector)
+function recalculateIndicators(candles) {
+  if (!candles || candles.length < 5) return;
+
+  const indicatorMarkers = [];
+  
+  // ─── 1. FVG Detection ───
+  let latestBullishFvg = null;
+  let latestBearishFvg = null;
+
+  for (let i = 2; i < candles.length; i++) {
+    const c1 = candles[i-2];
+    const c2 = candles[i-1];
+    const c3 = candles[i];
+    
+    // Bullish FVG
+    if (c3.low > c1.high && c2.close > c2.open) {
+      // Check mitigation
+      let mitigated = false;
+      for (let j = i + 1; j < candles.length; j++) {
+        if (candles[j].low <= c1.high) {
+          mitigated = true;
+          break;
+        }
+      }
+      if (!mitigated) {
+        latestBullishFvg = { top: c3.low, bottom: c1.high, time: c2.time };
+      }
+      
+      // Add FVG creation marker if FVG display is enabled
+      if (showFVG) {
+        indicatorMarkers.push({
+          time: c2.time,
+          position: 'belowBar',
+          color: '#00ff88',
+          shape: 'arrowUp',
+          text: 'FVG'
+        });
+      }
+    }
+    
+    // Bearish FVG
+    if (c3.high < c1.low && c2.close < c2.open) {
+      // Check mitigation
+      let mitigated = false;
+      for (let j = i + 1; j < candles.length; j++) {
+        if (candles[j].high >= c1.low) {
+          mitigated = true;
+          break;
+        }
+      }
+      if (!mitigated) {
+        latestBearishFvg = { top: c1.low, bottom: c3.high, time: c2.time };
+      }
+      
+      // Add FVG creation marker if FVG display is enabled
+      if (showFVG) {
+        indicatorMarkers.push({
+          time: c2.time,
+          position: 'aboveBar',
+          color: '#ff3366',
+          shape: 'arrowDown',
+          text: 'FVG'
+        });
+      }
+    }
+  }
+
+  // Handle new FVG alerts (only trigger on the most recent candles to avoid alert spam)
+  if (latestBullishFvg && (!lastBullishFvg || lastBullishFvg.time !== latestBullishFvg.time)) {
+    lastBullishFvg = latestBullishFvg;
+    const isRecent = latestBullishFvg.time >= candles[candles.length - 2].time;
+    if (isRecent) {
+      addLogEntry(`🚨 SMC FVG: New Bullish Imbalance formed at $${formatPrice(latestBullishFvg.bottom)} - $${formatPrice(latestBullishFvg.top)}`, 'green');
+      playSynthesizedSound('sweep');
+    }
+  }
+  if (latestBearishFvg && (!lastBearishFvg || lastBearishFvg.time !== latestBearishFvg.time)) {
+    lastBearishFvg = latestBearishFvg;
+    const isRecent = latestBearishFvg.time >= candles[candles.length - 2].time;
+    if (isRecent) {
+      addLogEntry(`🚨 SMC FVG: New Bearish Imbalance formed at $${formatPrice(latestBearishFvg.bottom)} - $${formatPrice(latestBearishFvg.top)}`, 'red');
+      playSynthesizedSound('sweep');
+    }
+  }
+
+  // Update FVG Price Lines
+  if (priceLines.fvgBullishTop && priceLines.fvgBullishBottom) {
+    if (showFVG && latestBullishFvg) {
+      priceLines.fvgBullishTop.applyOptions({ price: latestBullishFvg.top, color: 'rgba(0, 255, 136, 0.55)' });
+      priceLines.fvgBullishBottom.applyOptions({ price: latestBullishFvg.bottom, color: 'rgba(0, 255, 136, 0.55)' });
+    } else {
+      priceLines.fvgBullishTop.applyOptions({ price: 0, color: 'transparent' });
+      priceLines.fvgBullishBottom.applyOptions({ price: 0, color: 'transparent' });
+    }
+  }
+
+  if (priceLines.fvgBearishTop && priceLines.fvgBearishBottom) {
+    if (showFVG && latestBearishFvg) {
+      priceLines.fvgBearishTop.applyOptions({ price: latestBearishFvg.top, color: 'rgba(255, 51, 102, 0.55)' });
+      priceLines.fvgBearishBottom.applyOptions({ price: latestBearishFvg.bottom, color: 'rgba(255, 51, 102, 0.55)' });
+    } else {
+      priceLines.fvgBearishTop.applyOptions({ price: 0, color: 'transparent' });
+      priceLines.fvgBearishBottom.applyOptions({ price: 0, color: 'transparent' });
+    }
+  }
+
+  // ─── 2. BOS / CHoCH Detection ───
+  let activeSwingHigh = null;
+  let activeSwingLow = null;
+  let trend = 'bullish'; // Initial assumption
+
+  for (let i = 2; i < candles.length - 2; i++) {
+    const c = candles[i];
+    
+    // Check Swing High
+    const isSwingHigh = c.high > candles[i-1].high && c.high > candles[i-2].high &&
+                        c.high > candles[i+1].high && c.high > candles[i+2].high;
+    if (isSwingHigh) {
+      activeSwingHigh = { price: c.high, time: c.time };
+    }
+
+    // Check Swing Low
+    const isSwingLow = c.low < candles[i-1].low && c.low < candles[i-2].low &&
+                       c.low < candles[i+1].low && c.low < candles[i+2].low;
+    if (isSwingLow) {
+      activeSwingLow = { price: c.low, time: c.time };
+    }
+
+    // Check Breakout of active swing high (confirmed at index i+2)
+    const nextCandle = candles[i+2];
+    if (nextCandle) {
+      if (activeSwingHigh && nextCandle.close > activeSwingHigh.price) {
+        const breakPrice = activeSwingHigh.price;
+        if (trend === 'bullish') {
+          // BOS
+          if (showBosChoch) {
+            indicatorMarkers.push({
+              time: nextCandle.time,
+              position: 'aboveBar',
+              color: '#ffcc00',
+              shape: 'arrowUp',
+              text: 'BOS'
+            });
+          }
+          lastBosPrice = breakPrice;
+          
+          // Trigger alert if it's the latest candle or near it
+          if (i + 2 >= candles.length - 2) {
+            addLogEntry(`⚡ BOS: Bullish Structure Broken at $${formatPrice(breakPrice)} - Trend Continues!`, 'yellow');
+            playSynthesizedSound('impact');
+          }
+        } else {
+          // CHoCH
+          trend = 'bullish';
+          if (showBosChoch) {
+            indicatorMarkers.push({
+              time: nextCandle.time,
+              position: 'aboveBar',
+              color: '#ff8800',
+              shape: 'arrowUp',
+              text: 'CHoCH'
+            });
+          }
+          lastChochPrice = breakPrice;
+          
+          if (i + 2 >= candles.length - 2) {
+            addLogEntry(`🔄 CHoCH: Change of Character to Bullish at $${formatPrice(breakPrice)}! Reversal warning.`, 'cyan');
+            playSynthesizedSound('impact');
+          }
+        }
+        activeSwingHigh = null; // structure broken
+      }
+
+      // Check Breakout of active swing low
+      if (activeSwingLow && nextCandle.close < activeSwingLow.price) {
+        const breakPrice = activeSwingLow.price;
+        if (trend === 'bearish') {
+          // BOS
+          if (showBosChoch) {
+            indicatorMarkers.push({
+              time: nextCandle.time,
+              position: 'belowBar',
+              color: '#ffcc00',
+              shape: 'arrowDown',
+              text: 'BOS'
+            });
+          }
+          lastBosPrice = breakPrice;
+          
+          if (i + 2 >= candles.length - 2) {
+            addLogEntry(`⚡ BOS: Bearish Structure Broken at $${formatPrice(breakPrice)} - Trend Continues!`, 'yellow');
+            playSynthesizedSound('impact');
+          }
+        } else {
+          // CHoCH
+          trend = 'bearish';
+          if (showBosChoch) {
+            indicatorMarkers.push({
+              time: nextCandle.time,
+              position: 'belowBar',
+              color: '#ff8800',
+              shape: 'arrowDown',
+              text: 'CHoCH'
+            });
+          }
+          lastChochPrice = breakPrice;
+          
+          if (i + 2 >= candles.length - 2) {
+            addLogEntry(`🔄 CHoCH: Change of Character to Bearish at $${formatPrice(breakPrice)}! Reversal warning.`, 'cyan');
+            playSynthesizedSound('impact');
+          }
+        }
+        activeSwingLow = null; // structure broken
+      }
+    }
+  }
+
+  // Update BOS / CHoCH Price Lines
+  if (priceLines.bosLevel) {
+    if (showBosChoch && lastBosPrice) {
+      priceLines.bosLevel.applyOptions({ price: lastBosPrice, color: 'rgba(255, 204, 0, 0.7)' });
+    } else {
+      priceLines.bosLevel.applyOptions({ price: 0, color: 'transparent' });
+    }
+  }
+  if (priceLines.chochLevel) {
+    if (showBosChoch && lastChochPrice) {
+      priceLines.chochLevel.applyOptions({ price: lastChochPrice, color: 'rgba(255, 136, 0, 0.7)' });
+    } else {
+      priceLines.chochLevel.applyOptions({ price: 0, color: 'transparent' });
+    }
+  }
+
+  // Save calculated indicator markers globally
+  activeIndicatorMarkers = indicatorMarkers;
+  applyAllMarkers();
 }
 
 // WebSocket Stream (Combined Stream for Kline updates and 24h Ticker data)
@@ -1293,14 +1674,34 @@ function initBinanceStream(asset) {
       
       if (stream.endsWith(`@kline_${selectedTimeframe}`)) {
         const k = data.k;
+        const timeSec = k.t / 1000;
+        const candleObj = {
+          time: timeSec,
+          open: parseFloat(k.o),
+          high: parseFloat(k.h),
+          low: parseFloat(k.l),
+          close: parseFloat(k.c)
+        };
+        
         if (candleSeries) {
-          candleSeries.update({
-            time: k.t / 1000,
-            open: parseFloat(k.o),
-            high: parseFloat(k.h),
-            low: parseFloat(k.l),
-            close: parseFloat(k.c)
-          });
+          candleSeries.update(candleObj);
+        }
+        
+        // Sync currentChartData for indicators recalculation
+        if (currentChartData) {
+          const lastIdx = currentChartData.length - 1;
+          if (lastIdx >= 0 && currentChartData[lastIdx].time === timeSec) {
+            // Update current open candle
+            currentChartData[lastIdx] = candleObj;
+          } else {
+            // New candle started
+            currentChartData.push(candleObj);
+            if (currentChartData.length > 150) currentChartData.shift();
+          }
+          
+          // Re-draw indicators
+          drawTrendlineOnChart(currentChartData);
+          recalculateIndicators(currentChartData);
         }
       } else if (stream.endsWith('@ticker')) {
         // 'c' is last price, 'P' is price change percent, 'v' is base asset volume
@@ -1431,13 +1832,13 @@ function recalculateSMC(price, change) {
   }
   
   // Update Price Lines on Chart
-  if (priceLines.bslMin) priceLines.bslMin.applyOptions({ price: bslMin });
-  if (priceLines.bslMax) priceLines.bslMax.applyOptions({ price: bslMax });
-  if (priceLines.sslMin) priceLines.sslMin.applyOptions({ price: sslMin });
-  if (priceLines.sslMax) priceLines.sslMax.applyOptions({ price: sslMax });
-  if (priceLines.whaleSupply) priceLines.whaleSupply.applyOptions({ price: price * 1.006 });
-  if (priceLines.whaleDemand) priceLines.whaleDemand.applyOptions({ price: price * 0.994 });
-  if (priceLines.trappedLiq) priceLines.trappedLiq.applyOptions({ price: trapPrice });
+  if (priceLines.bslMin) priceLines.bslMin.applyOptions({ price: bslMin, color: showLiquidity ? 'rgba(255, 51, 102, 0.65)' : 'transparent' });
+  if (priceLines.bslMax) priceLines.bslMax.applyOptions({ price: bslMax, color: showLiquidity ? 'rgba(255, 51, 102, 0.65)' : 'transparent' });
+  if (priceLines.sslMin) priceLines.sslMin.applyOptions({ price: sslMin, color: showLiquidity ? 'rgba(0, 255, 136, 0.65)' : 'transparent' });
+  if (priceLines.sslMax) priceLines.sslMax.applyOptions({ price: sslMax, color: showLiquidity ? 'rgba(0, 255, 136, 0.65)' : 'transparent' });
+  if (priceLines.whaleSupply) priceLines.whaleSupply.applyOptions({ price: price * 1.006, color: showWhaleWalls ? '#ff3366' : 'transparent' });
+  if (priceLines.whaleDemand) priceLines.whaleDemand.applyOptions({ price: price * 0.994, color: showWhaleWalls ? '#00ff88' : 'transparent' });
+  if (priceLines.trappedLiq) priceLines.trappedLiq.applyOptions({ price: trapPrice, color: showLiquidity ? '#ffcc00' : 'transparent' });
 
   // 4. Alert trigger logic on tick
   checkAlertThresholds(price, bslMin, bslMax, sslMin, sslMax);
@@ -1571,6 +1972,18 @@ function startSimulatedOrderFlow() {
         }
         
         candleSeries.update(currentCandle);
+        
+        // Synchronize currentChartData
+        if (currentChartData) {
+          const lastIdx = currentChartData.length - 1;
+          if (lastIdx >= 0 && currentChartData[lastIdx].time === candleTime) {
+            currentChartData[lastIdx] = currentCandle;
+          } else {
+            currentChartData.push(currentCandle);
+            if (currentChartData.length > 150) currentChartData.shift();
+          }
+          recalculateIndicators(currentChartData);
+        }
         
         // 3. Add visual markers dynamically based on simulated action
         if (Math.random() < 0.15) { // 15% chance per tick to place a marker to avoid overcrowding
